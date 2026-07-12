@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Lava Flap - Volcanic Flyer Game</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #1a0000;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Arial, "Helvetica Neue", sans-serif;
+  }
+
+  #stage {
+    position: relative;
+    line-height: 0;
+    /* --s is the scale factor relative to the 480x640 design, set by JS */
+    --s: 1;
+  }
+
+  canvas#game {
+    display: block;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    border-radius: calc(20px * var(--s));
+    box-shadow: 0 0 calc(40px * var(--s)) rgba(255, 60, 0, 0.5);
+  }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+
+  .hidden { display: none !important; }
+
+  /* ---------- Idle screen ---------- */
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: calc(10px * var(--s));
+    margin-bottom: calc(4px * var(--s));
+  }
+
+  .icon-flame {
+    width: calc(40px * var(--s));
+    height: calc(40px * var(--s));
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 calc(10px * var(--s)) #ff6600);
+  }
+
+  .title-text {
+    font-family: "Arial Black", Arial, sans-serif;
+    font-weight: 900;
+    font-size: calc(42px * var(--s));
+    color: #ffdd44;
+    text-shadow: 0 0 calc(20px * var(--s)) #ff6600, calc(2px * var(--s)) calc(3px * var(--s)) 0 #880000;
+    letter-spacing: calc(2px * var(--s));
+    white-space: nowrap;
+  }
+
+  .subtitle {
+    font-size: calc(14px * var(--s));
+    color: #ffaa66;
+    margin-bottom: calc(32px * var(--s));
+    text-shadow: 0 calc(1px * var(--s)) calc(4px * var(--s)) #000;
+    text-align: center;
+    padding: 0 calc(10px * var(--s));
+  }
+
+  .btn {
+    pointer-events: auto;
+    cursor: pointer;
+    border: none;
+    background: linear-gradient(180deg, #a8f060 0%, #6ac020 100%);
+    border-radius: calc(14px * var(--s));
+    padding: calc(14px * var(--s)) calc(56px * var(--s));
+    font-size: calc(22px * var(--s));
+    font-weight: 900;
+    color: #1a4000;
+    letter-spacing: calc(1px * var(--s));
+    box-shadow: 0 calc(6px * var(--s)) 0 #2a6000, 0 calc(8px * var(--s)) calc(20px * var(--s)) rgba(0,0,0,0.4);
+    font-family: "Arial Black", Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(10px * var(--s));
+    transition: transform 0.08s, box-shadow 0.08s;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .btn:active {
+    transform: translateY(calc(4px * var(--s)));
+    box-shadow: 0 calc(2px * var(--s)) 0 #2a6000, 0 calc(4px * var(--s)) calc(12px * var(--s)) rgba(0,0,0,0.4);
+  }
+
+  .btn svg { width: calc(20px * var(--s)); height: calc(20px * var(--s)); flex-shrink: 0; }
+
+  .hint {
+    margin-top: calc(20px * var(--s));
+    font-size: calc(13px * var(--s));
+    color: rgba(255, 170, 102, 0.67);
+    text-shadow: 0 calc(1px * var(--s)) calc(4px * var(--s)) #000;
+    text-align: center;
+    padding: 0 calc(10px * var(--s));
+  }
+
+  .best-row {
+    margin-top: calc(12px * var(--s));
+    display: flex;
+    align-items: center;
+    gap: calc(6px * var(--s));
+    font-family: "Arial Black", Arial, sans-serif;
+    font-size: calc(16px * var(--s));
+    color: #ffdd44;
+    text-shadow: 0 0 calc(10px * var(--s)) #ff6600;
+  }
+
+  .best-row svg { width: calc(16px * var(--s)); height: calc(16px * var(--s)); }
+
+  /* ---------- Game over screen ---------- */
+  .panel {
+    background: rgba(20, 0, 0, 0.82);
+    border-radius: calc(20px * var(--s));
+    padding: calc(28px * var(--s)) calc(44px * var(--s));
+    text-align: center;
+    box-shadow: 0 0 calc(40px * var(--s)) rgba(255,60,0,0.3), inset 0 0 calc(20px * var(--s)) rgba(255,60,0,0.1);
+    border: calc(2px * var(--s)) solid rgba(255,80,0,0.3);
+    max-width: 90%;
+  }
+
+  .gameover-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(10px * var(--s));
+    margin-bottom: calc(6px * var(--s));
+  }
+
+  .icon-skull {
+    width: calc(34px * var(--s));
+    height: calc(34px * var(--s));
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 calc(8px * var(--s)) #ff2200);
+  }
+
+  .gameover-text {
+    font-family: "Arial Black", Arial, sans-serif;
+    font-weight: 900;
+    font-size: calc(34px * var(--s));
+    color: #ff4400;
+    text-shadow: 0 0 calc(20px * var(--s)) #ff2200;
+    white-space: nowrap;
+  }
+
+  .death-msg {
+    font-size: calc(15px * var(--s));
+    color: #ffaa66;
+    margin-bottom: calc(16px * var(--s));
+  }
+
+  .stats-row {
+    display: flex;
+    gap: calc(24px * var(--s));
+    justify-content: center;
+    margin-bottom: calc(24px * var(--s));
+  }
+
+  .stat-label {
+    font-size: calc(11px * var(--s));
+    color: rgba(255, 170, 102, 0.6);
+    text-transform: uppercase;
+    letter-spacing: calc(1px * var(--s));
+  }
+
+  .stat-value {
+    font-size: calc(40px * var(--s));
+    font-weight: 900;
+    color: #ffffff;
+    font-family: "Arial Black", Arial, sans-serif;
+    line-height: 1.1;
+  }
+
+  .stat-value.best {
+    color: #ffdd44;
+    text-shadow: 0 0 calc(12px * var(--s)) #ff8800;
+  }
+
+  .divider {
+    width: 1px;
+    background: rgba(255, 100, 0, 0.3);
+  }
+
+  .btn-full { width: 100%; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <canvas id="game" width="480" height="640"></canvas>
+
+  <!-- IDLE SCREEN -->
+  <div id="idleScreen" class="overlay">
+    <div class="title-row">
+      <svg class="icon-flame" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C12 2 7 7.5 7 12.5C7 15.5 9 17.5 11 17.5C10.2 16.5 10 15.3 10 14.5C10 12.5 12 10.5 12 8.5C12 10 13.5 11 13.5 13C13.5 14 13 15 12.5 15.5C14.5 15.5 17 13.8 17 11C17 7 13 5 12 2Z" fill="#ffdd44" stroke="#ff6600" stroke-width="1"/>
+        <path d="M9.5 15C9.5 17.5 11 20 14 20C17 20 18.5 17.7 18.5 15.2C18.5 13 17 11.5 17 11.5C17.3 13 16.5 14.5 15.5 15C15.8 13.8 15.3 12.8 15.3 12.8C15.3 14.3 13.5 15.5 12.5 17C11.8 18 11.5 19 11.5 19C10.3 18.3 9.5 16.8 9.5 15Z" fill="#ff8800"/>
+      </svg>
+      <div class="title-text">LAVA FLAP</div>
+    </div>
+    <div class="subtitle">Survive the volcanic pillars!</div>
+
+    <button id="playBtn" class="btn">
+      <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 5v14l11-7L8 5z"/>
+      </svg>
+      PLAY
+    </button>
+
+    <div class="hint">CLICK / TAP / SPACE to flap</div>
+
+    <div id="bestRow" class="best-row hidden">
+      <svg viewBox="0 0 24 24" fill="#ffdd44" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 2h-2V0H8v2H6C4.9 2 4 2.9 4 4v2c0 2.4 1.7 4.4 4 4.9.4 1.2 1.3 2.1 2.5 2.5V16H8v2h8v-2h-2.5v-2.6c1.2-.4 2.1-1.3 2.5-2.5 2.3-.5 4-2.5 4-4.9V4c0-1.1-.9-2-2-2zM6 6V4h2v3.8C6.8 7.4 6 6.8 6 6zm12 0c0 .8-.8 1.4-2 1.8V4h2v2zM7 22h10v-2H7v2z"/>
+      </svg>
+      <span>BEST: <span id="bestValIdle">0</span></span>
+    </div>
+  </div>
+
+  <!-- GAME OVER SCREEN -->
+  <div id="deadScreen" class="overlay hidden">
+    <div class="panel">
+      <div class="gameover-row">
+        <svg class="icon-skull" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C7.58 2 4 5.58 4 10c0 2.9 1.55 5.44 3.86 6.84L7.5 19h2l.4-1.5h4.2L14.5 19h2l-.36-2.16C18.45 15.44 20 12.9 20 10c0-4.42-3.58-8-8-8z" fill="#ff4400"/>
+          <circle cx="9" cy="10.5" r="1.6" fill="#1a0000"/>
+          <circle cx="15" cy="10.5" r="1.6" fill="#1a0000"/>
+          <path d="M11 13l-.8 2h1.6L11 13z" fill="#1a0000"/>
+        </svg>
+        <div class="gameover-text">GAME OVER</div>
+      </div>
+      <div class="death-msg">You got burned by the lava!</div>
+
+      <div class="stats-row">
+        <div>
+          <div class="stat-label">Score</div>
+          <div class="stat-value" id="scoreVal">0</div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="stat-label">Best</div>
+          <div class="stat-value best" id="bestVal">0</div>
+        </div>
+      </div>
+
+      <button id="restartBtn" class="btn btn-full">
+        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+        PLAY AGAIN
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ── Constants (design space, matches original) ─────────────────────────
+  const W = 480;
+  const H = 640;
+
+  const GRAVITY = 0.45;
+  const FLAP_STRENGTH = -9;
+  const PIPE_SPEED = 2.8;
+  const PIPE_GAP = 155;
+  const PIPE_WIDTH = 72;
+  const PIPE_INTERVAL = 1700;
+  const BIRD_X = 90;
+  const BIRD_SIZE = 38;
+
+  // ── DOM refs ─────────────────────────────────────────────────────────
+  const stage = document.getElementById("stage");
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const idleScreen = document.getElementById("idleScreen");
+  const deadScreen = document.getElementById("deadScreen");
+  const playBtn = document.getElementById("playBtn");
+  const restartBtn = document.getElementById("restartBtn");
+  const scoreVal = document.getElementById("scoreVal");
+  const bestVal = document.getElementById("bestVal");
+  const bestValIdle = document.getElementById("bestValIdle");
+  const bestRow = document.getElementById("bestRow");
+
+  // ── Responsive sizing ────────────────────────────────────────────────
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const padding = 16;
+    const maxW = window.innerWidth - padding * 2;
+    const maxH = window.innerHeight - padding * 2;
+
+    let dispW = maxW;
+    let dispH = (dispW * H) / W;
+    if (dispH > maxH) {
+      dispH = maxH;
+      dispW = (dispH * W) / H;
+    }
+
+    stage.style.width = dispW + "px";
+    stage.style.height = dispH + "px";
+    stage.style.setProperty("--s", (dispW / W).toFixed(4));
+
+    canvas.style.width = dispW + "px";
+    canvas.style.height = dispH + "px";
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", resize);
+  resize();
+
+  // ── State ────────────────────────────────────────────────────────────
+  let state = "idle"; // idle | playing | dead
+  let birdY = H / 2;
+  let birdVel = 0;
+  let pipes = [];
+  let score = 0;
+  let best = 0;
+  let frame = 0;
+  let bgOffset = 0;
+  let lastPipeTime = 0;
+  let particles = [];
+  let lastTime = 0;
+
+  try {
+    const saved = parseInt(localStorage.getItem("lavaFlapBest") || "0", 10);
+    if (!isNaN(saved)) best = saved;
+  } catch (e) {}
+  updateBestDisplays();
+
+  function updateBestDisplays() {
+    bestVal.textContent = String(best);
+    bestValIdle.textContent = String(best);
+    if (best > 0) bestRow.classList.remove("hidden");
+    else bestRow.classList.add("hidden");
+  }
+
+  // ── Draw helpers ─────────────────────────────────────────────────────
+  function drawBackground(offset) {
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#3a0000");
+    sky.addColorStop(1, "#b83000");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    const glowCount = 4;
+    for (let i = 0; i < glowCount; i++) {
+      const x = ((offset * 0.15 + i * (W / glowCount)) % (W + 200)) - 100;
+      const y = H * 0.6 + Math.sin(i * 1.3) * 80;
+      const grad = ctx.createRadialGradient(x, y, 10, x, y, 150);
+      grad.addColorStop(0, "rgba(255,100,0,0.15)");
+      grad.addColorStop(1, "rgba(255,100,0,0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, 150, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const groundGlow = ctx.createLinearGradient(0, H - 60, 0, H);
+    groundGlow.addColorStop(0, "rgba(255,80,0,0.0)");
+    groundGlow.addColorStop(1, "rgba(255,80,0,0.35)");
+    ctx.fillStyle = groundGlow;
+    ctx.fillRect(0, H - 60, W, 60);
+  }
+
+  function drawLavaPillar(x, y, pw, ph, flipped) {
+    ctx.save();
+    if (flipped) {
+      ctx.translate(x + pw / 2, y + ph / 2);
+      ctx.scale(1, -1);
+      ctx.translate(-(x + pw / 2), -(y + ph / 2));
+    }
+
+    const grad = ctx.createLinearGradient(x, 0, x + pw, 0);
+    grad.addColorStop(0, "#5a2a10");
+    grad.addColorStop(0.25, "#8b5030");
+    grad.addColorStop(0.5, "#a06038");
+    grad.addColorStop(0.75, "#7a4020");
+    grad.addColorStop(1, "#3a1508");
+    ctx.fillStyle = grad;
+
+    ctx.beginPath();
+    ctx.roundRect(x + 4, y, pw - 8, ph, [4]);
+    ctx.fill();
+
+    ctx.strokeStyle = "#2a1005";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.strokeStyle = "#ff6600";
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = "#ff4400";
+    ctx.shadowBlur = 6;
+
+    ctx.beginPath();
+    ctx.moveTo(x + pw * 0.3, y + ph * 0.1);
+    ctx.lineTo(x + pw * 0.35, y + ph * 0.3);
+    ctx.lineTo(x + pw * 0.28, y + ph * 0.5);
+    ctx.lineTo(x + pw * 0.32, y + ph * 0.75);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x + pw * 0.65, y + ph * 0.15);
+    ctx.lineTo(x + pw * 0.6, y + ph * 0.4);
+    ctx.lineTo(x + pw * 0.68, y + ph * 0.6);
+    ctx.lineTo(x + pw * 0.62, y + ph * 0.85);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    const capH = 20;
+    const capGrad = ctx.createLinearGradient(x - 4, 0, x + pw + 4, 0);
+    capGrad.addColorStop(0, "#4a2008");
+    capGrad.addColorStop(0.3, "#7a4828");
+    capGrad.addColorStop(0.7, "#9a5838");
+    capGrad.addColorStop(1, "#3a1808");
+    ctx.fillStyle = capGrad;
+    ctx.beginPath();
+    ctx.roundRect(x - 5, y, pw + 10, capH, [5]);
+    ctx.fill();
+    ctx.strokeStyle = "#1a0803";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawBird(x, y, size, vel, frameN) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    const angle = Math.min(Math.max(vel * 0.05, -0.4), 0.6);
+    ctx.rotate(angle);
+
+    const r = size / 2;
+
+    ctx.shadowColor = "#ff9900";
+    ctx.shadowBlur = 16;
+
+    const bodyGrad = ctx.createRadialGradient(-r * 0.1, -r * 0.1, r * 0.1, 0, 0, r);
+    bodyGrad.addColorStop(0, "#ffdd44");
+    bodyGrad.addColorStop(0.4, "#ff8800");
+    bodyGrad.addColorStop(1, "#cc2200");
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r, r * 0.85, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+
+    const wingFlap = Math.sin(frameN * 0.25) * 0.4;
+    ctx.fillStyle = "#ff6600";
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.2, -r * 0.3 + wingFlap * r * 0.5, r * 0.55, r * 0.25, -0.4 + wingFlap, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(r * 0.3, -r * 0.15, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#1a0000";
+    ctx.beginPath();
+    ctx.arc(r * 0.36, -r * 0.12, r * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(r * 0.39, -r * 0.18, r * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffaa00";
+    ctx.beginPath();
+    ctx.moveTo(r * 0.6, -r * 0.05);
+    ctx.lineTo(r * 1.05, r * 0.05);
+    ctx.lineTo(r * 0.6, r * 0.2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#ff4400";
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.65, -r * 0.1);
+    ctx.lineTo(-r * 1.15, -r * 0.45);
+    ctx.lineTo(-r * 0.8, r * 0.1);
+    ctx.lineTo(-r * 1.05, r * 0.35);
+    ctx.lineTo(-r * 0.6, r * 0.2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawGround(offset) {
+    const gGrad = ctx.createLinearGradient(0, H - 40, 0, H);
+    gGrad.addColorStop(0, "#4a1500");
+    gGrad.addColorStop(1, "#1a0500");
+    ctx.fillStyle = gGrad;
+    ctx.fillRect(0, H - 40, W, 40);
+
+    ctx.fillStyle = "#ff4400";
+    ctx.shadowColor = "#ff6600";
+    ctx.shadowBlur = 8;
+    ctx.fillRect(0, H - 42, W, 4);
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = "#2a0800";
+    ctx.lineWidth = 1;
+    const blockW = 48;
+    const startX = -(offset % blockW);
+    for (let bx = startX; bx < W; bx += blockW) {
+      ctx.strokeRect(bx, H - 40, blockW, 20);
+      ctx.strokeRect(bx + blockW / 2, H - 20, blockW, 20);
+    }
+  }
+
+  function drawScore(s) {
+    ctx.save();
+    ctx.font = "bold 52px Arial";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillText(String(s), W / 2 + 2, 72);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(String(s), W / 2, 70);
+    ctx.restore();
+  }
+
+  function drawParticles(list) {
+    for (const p of list) {
+      ctx.save();
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function spawnParticles(x, y) {
+    const colors = ["#ff6600", "#ffaa00", "#ffdd00", "#ff3300"];
+    const result = [];
+    for (let i = 0; i < 16; i++) {
+      const angle = (Math.PI * 2 * i) / 16 + Math.random() * 0.4;
+      const speed = 2 + Math.random() * 4;
+      result.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 2,
+        r: 3 + Math.random() * 4,
+        alpha: 1,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: 0.04 + Math.random() * 0.03,
+      });
+    }
+    return result;
+  }
+
+  // ── Actions ──────────────────────────────────────────────────────────
+  function flap() {
+    if (state === "dead") return;
+    if (state === "idle") {
+      state = "playing";
+      idleScreen.classList.add("hidden");
+      lastPipeTime = performance.now();
+    }
+    birdVel = FLAP_STRENGTH;
+  }
+
+  function die() {
+    if (state !== "playing") return;
+    state = "dead";
+    particles.push(...spawnParticles(BIRD_X, birdY));
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem("lavaFlapBest", String(best)); } catch (e) {}
+    }
+    scoreVal.textContent = String(score);
+    updateBestDisplays();
+    deadScreen.classList.remove("hidden");
+  }
+
+  function restart() {
+    birdY = H / 2;
+    birdVel = 0;
+    pipes = [];
+    score = 0;
+    particles = [];
+    frame = 0;
+    bgOffset = 0;
+    lastPipeTime = 0;
+    state = "idle";
+    deadScreen.classList.add("hidden");
+    idleScreen.classList.remove("hidden");
+  }
+
+  // ── Main loop ────────────────────────────────────────────────────────
+  function loop(timestamp) {
+    requestAnimationFrame(loop);
+
+    const dt = Math.min((timestamp - lastTime) / 16.67, 3);
+    lastTime = timestamp;
+
+    if (state === "playing") bgOffset += PIPE_SPEED * dt;
+    drawBackground(bgOffset);
+
+    if (state === "playing") {
+      if (timestamp - lastPipeTime > PIPE_INTERVAL) {
+        const minGapY = PIPE_GAP / 2 + 60;
+        const maxGapY = H - 40 - PIPE_GAP / 2 - 60;
+        const gapY = minGapY + Math.random() * (maxGapY - minGapY);
+        pipes.push({ x: W + PIPE_WIDTH, gapY, scored: false });
+        lastPipeTime = timestamp;
+      }
+      for (const p of pipes) p.x -= PIPE_SPEED * dt;
+      pipes = pipes.filter((p) => p.x + PIPE_WIDTH > -20);
+    }
+
+    for (const p of pipes) {
+      const topH = p.gapY - PIPE_GAP / 2;
+      const botY = p.gapY + PIPE_GAP / 2;
+      const botH = H - 40 - botY;
+      if (topH > 0) drawLavaPillar(p.x, 0, PIPE_WIDTH, topH, true);
+      if (botH > 0) drawLavaPillar(p.x, botY, PIPE_WIDTH, botH, false);
+    }
+
+    if (state === "playing") {
+      birdVel += GRAVITY * dt;
+      birdY += birdVel * dt;
+      frame += dt;
+
+      if (birdY - BIRD_SIZE / 2 < 0) {
+        birdY = BIRD_SIZE / 2;
+        birdVel = 0;
+      }
+      if (birdY + BIRD_SIZE / 2 > H - 40) {
+        birdY = H - 40 - BIRD_SIZE / 2;
+        die();
+      }
+
+      const bx = BIRD_X, by = birdY, br = BIRD_SIZE / 2 - 4;
+      for (const p of pipes) {
+        if (!p.scored && p.x + PIPE_WIDTH < bx) {
+          p.scored = true;
+          score += 1;
+        }
+        const inXRange = bx + br > p.x + 4 && bx - br < p.x + PIPE_WIDTH - 4;
+        if (!inXRange) continue;
+
+        const topH = p.gapY - PIPE_GAP / 2;
+        const botY = p.gapY + PIPE_GAP / 2;
+        if (by - br < topH || by + br > botY) {
+          die();
+          break;
+        }
+      }
+
+      if (Math.random() < 0.3) {
+        particles.push({
+          x: BIRD_X - BIRD_SIZE * 0.4,
+          y: birdY + (Math.random() - 0.5) * 10,
+          vx: -1.5 - Math.random() * 2,
+          vy: (Math.random() - 0.5) * 1.5,
+          r: 2 + Math.random() * 2,
+          alpha: 0.8,
+          color: Math.random() < 0.5 ? "#ff6600" : "#ffcc00",
+          life: 0.05 + Math.random() * 0.03,
+        });
+      }
+    } else if (state === "idle") {
+      frame += dt;
+      birdY = H / 2 + Math.sin(frame * 0.05) * 10;
+    } else if (state === "dead") {
+      birdVel += GRAVITY * dt * 2;
+      birdY += birdVel * dt;
+      frame += dt;
+      if (birdY > H) birdY = H;
+    }
+
+    particles = particles.filter((p) => {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 0.1 * dt;
+      p.alpha -= p.life * dt;
+      p.r *= 0.98;
+      return p.alpha > 0;
+    });
+    drawParticles(particles);
+
+    drawBird(BIRD_X, birdY, BIRD_SIZE, birdVel, frame);
+    drawGround(bgOffset);
+
+    if (state === "playing" || state === "dead") drawScore(score);
+  }
+
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+
+  // ── Input ────────────────────────────────────────────────────────────
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space" || e.code === "ArrowUp") {
+      e.preventDefault();
+      if (state === "dead") return;
+      flap();
+    }
+  });
+
+  canvas.addEventListener("click", () => {
+    if (state !== "dead") flap();
+  });
+  canvas.addEventListener(
+    "touchstart",
+    (e) => {
+      e.preventDefault();
+      if (state !== "dead") flap();
+    },
+    { passive: false }
+  );
+
+  playBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    flap();
+  });
+  playBtn.addEventListener(
+    "touchstart",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      flap();
+    },
+    { passive: false }
+  );
+
+  restartBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    restart();
+  });
+  restartBtn.addEventListener(
+    "touchstart",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      restart();
+    },
+    { passive: false }
+  );
+})();
+</script>
+</body>
+</html>
